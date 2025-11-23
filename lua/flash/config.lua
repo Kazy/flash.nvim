@@ -215,6 +215,8 @@ local defaults = {
     -- options used for treesitter selections
     -- `require("flash").treesitter()`
     treesitter = {
+      ---@type table<string, "v" | "V">
+      selection_modes = {},
       labels = "abcdefghijklmnopqrstuvwxyz",
       jump = { pos = "range", autojump = true },
       search = { incremental = false },

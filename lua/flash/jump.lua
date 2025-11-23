@@ -76,7 +76,11 @@ function M.remote_op(match, state, register)
 
       if state.opts.jump.pos == "range" then
         vim.api.nvim_win_set_cursor(match.win, match.pos)
-        vim.cmd("normal! v")
+        if match.linewise then
+          vim.cmd("normal! V")
+        else
+          vim.cmd("normal! v")
+        end
         vim.api.nvim_win_set_cursor(match.win, match.end_pos)
       else
         vim.api.nvim_win_set_cursor(match.win, state.opts.jump.pos == "start" and match.pos or match.end_pos)
@@ -169,11 +173,13 @@ function M._jump(match, state, opts)
   M.open_folds(match)
   -- select range
   if state.opts.jump.pos == "range" then
-    if vim.fn.mode() == "v" then
-      vim.cmd("normal! v")
+    local mode = vim.fn.mode()
+    -- \22 is ^V, blockwise
+    if mode == "v" or mode == "V" or mode == "\22" then
+      vim.cmd("normal! \27") -- <Esc> to exit visual mode
     end
     vim.api.nvim_win_set_cursor(match.win, match.pos)
-    vim.cmd("normal! v")
+    vim.cmd("normal! " .. (match.selection_mode or "v"))
     vim.api.nvim_win_set_cursor(match.win, match.end_pos)
   else
     local pos = state.opts.jump.pos == "start" and match.pos or match.end_pos

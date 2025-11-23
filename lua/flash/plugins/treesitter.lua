@@ -11,7 +11,9 @@ local M = {}
 
 ---@param win number
 ---@param pos? Pos
-function M.get_nodes(win, pos)
+---@param opts? Flash.Config
+function M.get_nodes(win, pos, opts)
+  opts = opts or {}
   local buf = vim.api.nvim_win_get_buf(win)
   local line_count = vim.api.nvim_buf_line_count(buf)
   pos = pos or Pos()
@@ -62,20 +64,30 @@ function M.get_nodes(win, pos)
       pos = { range[1] + 1, range[2] },
       end_pos = { range[3] + 1, range[4] - 1 },
       first = first,
+      selection_mode = opts.selection_modes[node:type()],
     }
     first = false
+
     -- If the match is at the end of the buffer,
     -- then move it to the last character of the last line.
     if match.end_pos[1] > line_count then
       match.end_pos[1] = line_count
       match.end_pos[2] = #vim.api.nvim_buf_get_lines(buf, match.end_pos[1] - 1, match.end_pos[1], false)[1]
-    elseif match.end_pos[2] == -1 then
-      -- If the end points to the start of the next line, move it to the
-      -- end of the previous line.
-      -- Otherwise operations include the first character of the next line
-      local line = vim.api.nvim_buf_get_lines(buf, match.end_pos[1] - 2, match.end_pos[1] - 1, false)[1]
-      match.end_pos[1] = match.end_pos[1] - 1
-      match.end_pos[2] = #line
+    elseif match.end_pos[2] < 0 then
+      -- If the end column is negative (pointing before the line starts),
+      -- move it to the end of the previous line.
+      local prev_line_idx = match.end_pos[1] - 1
+      if prev_line_idx > 0 then
+        local line = vim.api.nvim_buf_get_lines(buf, prev_line_idx - 1, prev_line_idx, false)[1]
+        match.end_pos[1] = prev_line_idx
+        match.end_pos[2] = #line
+      end
+    end
+
+    -- Apply linewise adjustments after range corrections
+    if match.selection_mode == "V" then
+      match.pos[2] = 0
+      match.end_pos[2] = #vim.api.nvim_buf_get_lines(buf, match.end_pos[1] - 1, match.end_pos[1], false)[1]
     end
     local id = table.concat({ match.pos[1], match.pos[2], match.end_pos[1], match.end_pos[2] }, ":")
     if not done[id] then
@@ -97,7 +109,7 @@ end
 ---@param state Flash.State
 function M.matcher(win, state)
   local labels = state:labels()
-  local ret = M.get_nodes(win, state.pos)
+  local ret = M.get_nodes(win, state.pos, state.opts)
 
   for i = 1, #ret do
     ret[i].label = table.remove(labels, 1)
@@ -124,6 +136,7 @@ function M.jump(opts)
       current = m
     end
   end
+
   if state.opts.jump.autojump then
     current = state:jump(current)
   end
